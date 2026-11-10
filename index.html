@@ -69,7 +69,7 @@ const FMT={"Bière":["Canette","Petite bouteille","Grande bouteille"],"Boisson s
 const PAY=["Cash","Orange Money","Moov Money"];
 const payOpt=v=>PAY.map(x=>`<option${x===v?' selected':''}>${x}</option>`).join('');
 const RAIS=["Casse","Périmé ou gâté","Offert","Manque ou vol","Autre"];
-let D={p:[],a:[],v:[],l:[],bk:0},db=null,tab='v',cart={},per='j',q='',py='Cash';
+let D={p:[],a:[],v:[],l:[],bk:0},db=null,pend=null,tab='v',cart={},per='j',q='',py='Cash';
 const old0=()=>{try{const o=JSON.parse(localStorage.getItem(K));return o&&o.p?o:null}catch(e){return null}};
 function idb(){return new Promise((ok,ko)=>{const r=indexedDB.open('maquis',1);r.onupgradeneeded=()=>r.result.createObjectStore('k');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)})}
 async function boot(){try{db=await idb();const d=await new Promise((ok,ko)=>{const r=db.transaction('k').objectStore('k').get('d');r.onsuccess=()=>ok(r.result);r.onerror=ko});
@@ -144,8 +144,10 @@ function addA(){const p=P($('#ap').value),n=num('#aq'),c=num('#apc');
 if(!(n>0)||n!==Math.floor(n))return alert('Entre une quantité entière supérieure à 0.');if(isNaN(c)||c<0)return alert('Entre le prix d’achat unitaire.');
 const y=$('#apy').value,sn=$('#asn').value.trim(),te=y==='Cash'?'':$('#ate').value.replace(/\s/g,''),tr=y==='Cash'?'':$('#atr').value.replace(/\s/g,'');
 if(!sn)return alert('Entre le nom de la structure qui a reçu l’argent.');if(y!=='Cash'&&!(tel(te)&&tel(tr)))return alert('Entre les deux numéros de téléphone (8 chiffres ou plus).');
-if(c!==p.b&&confirm('Le prix d’achat a changé. Mettre à jour la fiche du produit ?'))p.b=c;
-D.a.push({id:uid(),t:Date.now(),p:p.id,q:n,c,y,sn,te,tr});if(te)D.tel=te;save();render()}
+pend={p,n,c,y,sn,te,tr};if(c===p.b)return fin(0);
+modal(`<h3>Le prix d’achat a changé</h3><p class="mu">${E(p.n)} : ${m(p.b)} → <b>${m(c)}</b> l’unité. Prix de vente actuel : ${m(p.s)}, soit un gain de ${m(p.s-c)} par unité avec le nouveau prix d’achat.</p><label>Prix de vente (modifie-le si tu veux)<input id="nps" type="number" inputmode="decimal" min="0" value="${p.s}"></label><button class="w" onclick="fin(1)">Mettre à jour la fiche</button><button class="sec w" onclick="fin(0)">Garder les anciens prix</button><button class="sec w" onclick="pend=null;cm()">Annuler l’achat</button>`)}
+function fin(u){const x=pend;if(!x)return;if(u){const v=num('#nps');if(isNaN(v)||v<0)return alert('Entre le prix de vente.');if(v<x.c&&!confirm('Le prix de vente est plus bas que le prix d’achat : chaque vente sera une perte. Continuer ?'))return;x.p.b=x.c;x.p.s=v}
+D.a.push({id:uid(),t:Date.now(),p:x.p.id,q:x.n,c:x.c,y:x.y,sn:x.sn,te:x.te,tr:x.tr});if(x.te)D.tel=x.te;pend=null;save();cm();render()}
 function delA(id){const a=D.a.find(x=>x.id===id);if(stocks()[a.p]-a.q<0)return alert('Impossible : une partie de cet achat est déjà vendue ou perdue.');
 if(confirm('Supprimer cet achat ? Le stock diminuera de '+a.q+'.')){D.a=D.a.filter(x=>x!==a);save();render()}}
 
