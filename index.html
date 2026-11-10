@@ -88,9 +88,10 @@ function stocks(){const S={};D.p.forEach(p=>S[p.id]=0);D.a.forEach(a=>S[a.p]+=a.
 function go(t){tab=t;render();scrollTo(0,0)}
 function render(){const S=stocks();$('#app').innerHTML=({v:vVente,s:vStock,a:vAchat,l:vPerte,b:vBilan})[tab](S);
 document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
-$('#cb').innerHTML=tab==='v'?cartBar():'';if(tab==='a')acf();if(tab==='b')esp()}
+$('#cb').innerHTML=tab==='v'?cartBar():'';if(tab==='a'){acf();apf()}if(tab==='b')esp()}
 function modal(h){$('#m .mb').innerHTML=h;$('#m').hidden=false}
 function cm(){$('#m').hidden=true}
+const tel=v=>/^\+?\d{8,15}$/.test(v);
 const num=id=>{const v=$(id).value;return v===''?NaN:+v};
 
 /* VENTE */
@@ -98,11 +99,16 @@ function rowsV(S){const f=q.toLowerCase();return D.p.filter(p=>!p.x&&(p.n+' '+p.
 return `<div class="r${s<=0?' dim':''}"><div class="g"><b>${E(p.n)}</b><small>${E(p.t)}, ${E(p.f)}</small><small>${m(p.s)} • en stock : ${s}</small></div><div class="q"><button class="sec" onclick="ct('${p.id}',-1)">−</button><span>${n}</span><button onclick="ct('${p.id}',1)">+</button></div></div>`}).join('')||'<p class="mu">Aucun produit. Ajoute tes produits dans l’onglet Stock.</p>'}
 function vVente(S){return `<h2>Nouvelle vente</h2><input type="search" placeholder="Chercher un produit" value="${E(q)}" oninput="q=this.value;upV()"><div id="lst" style="margin-top:10px">${rowsV(S)}</div>`}
 function cartBar(){let t=0,c=0;for(const id in cart){t+=cart[id]*P(id).s;c+=cart[id]}
-return c?`<div class="cb"><div>${c} article(s)<br><b>${m(t)}</b></div><button class="sec" onclick="cart={};upV()">Vider</button><button onclick="sell()">Valider</button><div class="py">Payé en <select onchange="py=this.value">${payOpt(py)}</select></div></div>`:''}
+return c?`<div class="cb"><div>${c} article(s)<br><b>${m(t)}</b></div><button class="sec" onclick="cart={};upV()">Vider</button><button onclick="pay()">Valider</button></div>`:''}
 function upV(){$('#lst').innerHTML=rowsV(stocks());$('#cb').innerHTML=cartBar()}
 function ct(id,d){const s=stocks()[id],n=(cart[id]||0)+d;if(d>0&&n>s)return alert('Stock insuffisant : il en reste '+s+'.');if(n<=0)delete cart[id];else cart[id]=n;upV()}
-function sell(){const S=stocks(),L=[];for(const id in cart){const p=P(id);if(cart[id]>S[id])return alert('Stock insuffisant pour '+p.n);L.push({p:id,q:cart[id],pr:p.s,c:p.b})}
-if(!L.length)return;D.v.push({id:uid(),t:Date.now(),L,y:py});cart={};save();render()}
+function pay(){let t=0;for(const id in cart)t+=cart[id]*P(id).s;
+modal(`<h3>Finaliser la vente</h3><div class="big">${m(t)}</div><label>Payé en<select id="sy" onchange="py=this.value;spf()">${payOpt(py)}</select></label><label>Numéro du reçu<input id="src"></label><div id="stc"></div><div class="two" style="margin-top:14px"><button class="sec" onclick="cm()">Retour</button><button onclick="sell()">Enregistrer la vente</button></div>`);spf()}
+function spf(){$('#stc').innerHTML=py==='Cash'?'':'<label>Téléphone du client (numéro qui a transféré)<input id="stl" type="tel" inputmode="tel"></label>'}
+function sell(){const rc=$('#src').value.trim(),tc=py==='Cash'?'':$('#stl').value.replace(/\s/g,'');
+if(!rc)return alert('Entre le numéro du reçu.');if(py!=='Cash'&&!tel(tc))return alert('Entre le numéro de téléphone du client (8 chiffres ou plus).');
+const S=stocks(),L=[];for(const id in cart){const p=P(id);if(cart[id]>S[id])return alert('Stock insuffisant pour '+p.n);L.push({p:id,q:cart[id],pr:p.s,c:p.b})}
+if(!L.length)return;D.v.push({id:uid(),t:Date.now(),L,y:py,rc,tc});cart={};save();cm();render()}
 
 /* STOCK */
 function vStock(S){const A=D.p.filter(p=>!p.x),X=D.p.filter(p=>p.x);
@@ -130,12 +136,16 @@ function pa(id){const p=P(id);p.x=p.x?0:1;save();cm();render()}
 
 /* ACHATS */
 const opts=S=>D.p.filter(p=>!p.x).map(p=>`<option value="${p.id}">${E(p.n)} (${E(p.f)}), stock ${S[p.id]}</option>`).join('');
-function vAchat(S){return `<h2>Achats</h2>`+(D.p.some(p=>!p.x)?`<div class="card"><label>Produit<select id="ap" onchange="acf()">${opts(S)}</select></label><div class="two"><label>Quantité reçue<input id="aq" type="number" inputmode="numeric" min="1"></label><label>Prix d’achat unitaire<input id="apc" type="number" inputmode="decimal" min="0"></label></div><label>Payé par<select id="apy">${payOpt('Cash')}</select></label><button class="w" onclick="addA()">Enregistrer l’achat</button></div>`:'<p class="mu">Crée d’abord un produit dans l’onglet Stock.</p>')+'<h3>Derniers achats</h3><div>'+(D.a.filter(a=>!a.init).slice(-30).reverse().map(a=>`<div class="r"><div class="g"><b>${E(P(a.p).n)}</b><small>${dt(a.t)} • ${a.q} × ${m(a.c)} • ${E(a.y||'Cash')}</small></div><b>${m(a.q*a.c)}</b><button class="x" onclick="delA('${a.id}')">✕</button></div>`).join('')||'<p class="mu">Aucun achat enregistré.</p>')+'</div>'}
+function vAchat(S){return `<h2>Achats</h2>`+(D.p.some(p=>!p.x)?`<div class="card"><label>Produit<select id="ap" onchange="acf()">${opts(S)}</select></label><div class="two"><label>Quantité reçue<input id="aq" type="number" inputmode="numeric" min="1"></label><label>Prix d’achat unitaire<input id="apc" type="number" inputmode="decimal" min="0"></label></div><label>Payé par<select id="apy" onchange="apf()">${payOpt('Cash')}</select></label><div id="apx"></div><button class="w" onclick="addA()">Enregistrer l’achat</button></div>`:'<p class="mu">Crée d’abord un produit dans l’onglet Stock.</p>')+'<h3>Derniers achats</h3><div>'+(D.a.filter(a=>!a.init).slice(-30).reverse().map(a=>`<div class="r"><div class="g"><b>${E(P(a.p).n)}</b><small>${dt(a.t)} • ${a.q} × ${m(a.c)} • ${E(a.y||'Cash')}${a.sn?' • '+E(a.sn):''}</small></div><b>${m(a.q*a.c)}</b><button class="x" onclick="delA('${a.id}')">✕</button></div>`).join('')||'<p class="mu">Aucun achat enregistré.</p>')+'</div>'}
+function apf(){const y=$('#apy');if(!y)return;const o=$('#asn')?$('#asn').value:'',nm=[...new Set(D.a.map(a=>a.sn).filter(Boolean))];
+$('#apx').innerHTML=`<datalist id="fr">${nm.map(n=>`<option value="${E(n)}">`).join('')}</datalist><label>Nom de la structure qui a reçu<input id="asn" list="fr"></label>`+(y.value!=='Cash'?`<div class="two"><label>Numéro qui a envoyé<input id="ate" type="tel" inputmode="tel" value="${E(D.tel||'')}"></label><label>Numéro qui a reçu<input id="atr" type="tel" inputmode="tel"></label></div>`:'');$('#asn').value=o}
 function acf(){const s=$('#ap');if(s)$('#apc').value=P(s.value).b}
 function addA(){const p=P($('#ap').value),n=num('#aq'),c=num('#apc');
 if(!(n>0)||n!==Math.floor(n))return alert('Entre une quantité entière supérieure à 0.');if(isNaN(c)||c<0)return alert('Entre le prix d’achat unitaire.');
+const y=$('#apy').value,sn=$('#asn').value.trim(),te=y==='Cash'?'':$('#ate').value.replace(/\s/g,''),tr=y==='Cash'?'':$('#atr').value.replace(/\s/g,'');
+if(!sn)return alert('Entre le nom de la structure qui a reçu l’argent.');if(y!=='Cash'&&!(tel(te)&&tel(tr)))return alert('Entre les deux numéros de téléphone (8 chiffres ou plus).');
 if(c!==p.b&&confirm('Le prix d’achat a changé. Mettre à jour la fiche du produit ?'))p.b=c;
-D.a.push({id:uid(),t:Date.now(),p:p.id,q:n,c,y:$('#apy').value});save();render()}
+D.a.push({id:uid(),t:Date.now(),p:p.id,q:n,c,y,sn,te,tr});if(te)D.tel=te;save();render()}
 function delA(id){const a=D.a.find(x=>x.id===id);if(stocks()[a.p]-a.q<0)return alert('Impossible : une partie de cet achat est déjà vendue ou perdue.');
 if(confirm('Supprimer cet achat ? Le stock diminuera de '+a.q+'.')){D.a=D.a.filter(x=>x!==a);save();render()}}
 
@@ -162,7 +172,7 @@ return `<h2>Bilan</h2>${old?'<div class="warn">Pense à faire une sauvegarde de 
 <div class="card"><small>Argent encaissé (ventes)</small>${PAY.map(y=>ln(y,m(pv[y]||0))).join('')}<small style="margin-top:10px">Argent dépensé (achats)</small>${PAY.map(y=>ln(y,m(pw[y]||0))).join('')}</div>
 <div class="card">${ln('Achats de la période',m(ach))}${ln('Valeur du stock actuel',m(D.p.reduce((t,p)=>t+S[p.id]*p.b,0)))}<small>Un achat n’est pas une dépense perdue : il remplit le stock. Il ne réduit le bénéfice que lorsque le produit est vendu ou perdu.</small></div>
 ${low.length?`<h3>Stock bas</h3><div>${low.map(p=>`<div class="r"><div class="g"><b>${E(p.n)}</b><small>${E(p.f)}</small></div><div class="st lo">${S[p.id]}</div></div>`).join('')}</div>`:''}
-<h3>Ventes de la période</h3><div>${V.slice(-40).reverse().map(v=>{const t=v.L.reduce((a,i)=>a+i.q*i.pr,0);return `<div class="r"><div class="g"><b>${m(t)}</b><small>${dt(v.t)} • ${E(v.y||'Cash')} • ${v.L.map(i=>i.q+' '+E(P(i.p).n)).join(', ')}</small></div><button class="x" onclick="delV('${v.id}')">✕</button></div>`}).join('')||'<p class="mu">Aucune vente sur cette période.</p>'}</div>
+<h3>Ventes de la période</h3><div>${V.slice(-40).reverse().map(v=>{const t=v.L.reduce((a,i)=>a+i.q*i.pr,0);return `<div class="r"><div class="g"><b>${m(t)}</b><small>${dt(v.t)} • ${E(v.y||'Cash')}${v.rc?' • reçu '+E(v.rc):''}${v.tc?' • '+E(v.tc):''} • ${v.L.map(i=>i.q+' '+E(P(i.p).n)).join(', ')}</small></div><button class="x" onclick="delV('${v.id}')">✕</button></div>`}).join('')||'<p class="mu">Aucune vente sur cette période.</p>'}</div>
 <h3>Rapport à lire</h3><p class="mu">Un texte simple avec le résumé, le stock, les ventes, les achats et les pertes de la période choisie ci-dessus.</p><button class="w" onclick="rap()">Télécharger le rapport (.txt)</button>${navigator.share?'<button class="sec w" onclick="shr()">Envoyer le rapport (WhatsApp…)</button>':''}
 <h3>Sauvegarde des données</h3><p class="mu">Ce fichier n’est pas fait pour être lu : il sert seulement à tout restaurer si tu perds tes données.</p><button class="w" onclick="exp()">Sauvegarder (pour restaurer)</button>
 <button class="sec w" onclick="$('#fi2').click()">Restaurer une sauvegarde</button><input id="fi2" type="file" accept=".json" hidden onchange="imp(event)">
@@ -176,8 +186,8 @@ V.forEach(v=>{const y=v.y||'Cash';v.L.forEach(i=>{ca+=i.q*i.pr;cg+=i.q*i.c;pv[y]
 A.forEach(a=>{const y=a.y||'Cash';pw[y]=(pw[y]||0)+a.q*a.c});
 const pe=Lo.reduce((t,l)=>t+l.q*l.c,0),nm={j:'Aujourd’hui',s:'7 derniers jours',m:'Ce mois',t:'Tout'}[per];
 const T=['RAPPORT MON MAQUIS','Période : '+nm,'Édité le '+dt(Date.now()),'','RÉSUMÉ',ln('Ventes',mt(ca)),ln('Coût des produits',mt(cg)),ln('Marge sur ventes',mt(ca-cg)),ln('Pertes',mt(pe)),ln('BÉNÉFICE NET',mt(ca-cg-pe)),'','ARGENT ENCAISSÉ',...PAY.map(y=>ln(y,mt(pv[y]||0))),'','ARGENT DÉPENSÉ (ACHATS)',...PAY.map(y=>ln(y,mt(pw[y]||0))),'','STOCK ACTUEL',...D.p.filter(p=>!p.x).map(p=>'- '+p.n+' ('+p.f+') : '+S[p.id]+(S[p.id]<=p.min?'  <- STOCK BAS':'')),
-'','VENTES ('+V.length+')',...V.map(v=>dt(v.t)+' | '+(v.y||'Cash')+' | '+v.L.map(i=>i.q+' '+P(i.p).n).join(', ')+' | '+mt(v.L.reduce((a,i)=>a+i.q*i.pr,0))),
-'','ACHATS ('+A.length+')',...A.map(a=>dt(a.t)+' | '+(a.y||'Cash')+' | '+a.q+' '+P(a.p).n+' x '+mt(a.c)+' = '+mt(a.q*a.c)),
+'','VENTES ('+V.length+')',...V.map(v=>dt(v.t)+' | '+(v.y||'Cash')+(v.rc?' | reçu '+v.rc:'')+(v.tc?' | tél '+v.tc:'')+' | '+v.L.map(i=>i.q+' '+P(i.p).n).join(', ')+' | '+mt(v.L.reduce((a,i)=>a+i.q*i.pr,0))),
+'','ACHATS ('+A.length+')',...A.map(a=>dt(a.t)+' | '+(a.y||'Cash')+(a.sn?' | '+a.sn:'')+(a.te?' | de '+a.te+' vers '+a.tr:'')+' | '+a.q+' '+P(a.p).n+' x '+mt(a.c)+' = '+mt(a.q*a.c)),
 '','PERTES ('+Lo.length+')',...Lo.map(l=>dt(l.t)+' | '+l.q+' '+P(l.p).n+' | '+l.r+' | '+mt(l.q*l.c))];
 return T.join('\n')}
 function rap(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt()],{type:'text/plain;charset=utf-8'}));a.download='maquis-rapport-'+new Date().toISOString().slice(0,10)+'.txt';a.click()}
